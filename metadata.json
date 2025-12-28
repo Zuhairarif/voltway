@@ -2,6 +2,7 @@
   "name": "Hugo - Voltway Procurement AI",
   "description": "An agentic AI assistant for industrial procurement, helping Voltway optimize scooter production, inventory levels, and supplier relationships.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "geolocation"
   ]
 }

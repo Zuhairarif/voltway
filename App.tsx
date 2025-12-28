@@ -4,21 +4,21 @@ import Dashboard from './components/Dashboard';
 import HugoChat from './components/HugoChat';
 import DataTable from './components/DataTable';
 import BOMManager from './components/BOMManager';
-import { Badge, cn } from './components/ui';
+import VersionHistory from './components/VersionHistory';
+import { Badge, Button, cn } from './components/ui';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from './lib/supabase';
 import { AppState } from './types';
 
-type Tab = 'dashboard' | 'hugo' | 'materials' | 'products' | 'customers' | 'inventory' | 'orders' | 'suppliers' | 'boms';
+type Tab = 'dashboard' | 'hugo' | 'materials' | 'products' | 'customers' | 'inventory' | 'orders' | 'suppliers' | 'boms' | 'history';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // We fetch the full state for Dashboard/Hugo, but DataTables handle their own internal queries
   const { data: fullState, isLoading } = useQuery<AppState>({
     queryKey: ['full_state'],
     queryFn: async () => {
-      // Parallel fetch for overview
       const tables = ['materials', 'products', 'customers', 'bom', 'warehouses', 'stock', 'sales_orders', 'suppliers', 'material_orders', 'dispatch_parameters'];
       const results = await Promise.all(tables.map(t => supabase.from(t).select('*')));
       
@@ -28,59 +28,101 @@ const App: React.FC = () => {
       });
       return state as AppState;
     },
-    refetchInterval: 30000 // Refresh state every 30s
+    refetchInterval: 30000 
   });
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'hugo', label: 'Hugo AI', icon: '🤖' },
     { id: 'boms', label: 'Production BOM', icon: '📋' },
-    { id: 'materials', label: 'Material Master', icon: '🔩' },
-    { id: 'products', label: 'Product Catalog', icon: '🛵' },
-    { id: 'customers', label: 'Client Base', icon: '👥' },
-    { id: 'inventory', label: 'Stock Levels', icon: '📦' },
+    { id: 'materials', label: 'Materials', icon: '🔩' },
+    { id: 'products', label: 'Products', icon: '🛵' },
+    { id: 'inventory', label: 'Stock', icon: '📦' },
     { id: 'orders', label: 'Purchasing', icon: '📝' },
-    { id: 'suppliers', label: 'Vendor Registry', icon: '🏭' },
+    { id: 'history', label: 'History', icon: '🕙' },
+  ];
+
+  const adminItems = [
+    { id: 'customers', label: 'Clients', icon: '👥' },
+    { id: 'suppliers', label: 'Vendors', icon: '🏭' },
   ];
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-100">
       {/* Sidebar Navigation */}
-      <nav className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col p-6 shrink-0">
-        <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-bold text-slate-950 shadow-lg shadow-emerald-500/20">V</div>
-          <div>
-            <h1 className="text-lg font-bold leading-tight">Voltway</h1>
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Industrial OS</p>
-          </div>
+      <nav className={cn(
+        "bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300 ease-in-out shrink-0",
+        isCollapsed ? "w-20 px-3 py-6" : "w-64 p-6"
+      )}>
+        <div className={cn("flex items-center gap-3 mb-10 overflow-hidden", isCollapsed ? "justify-center" : "px-2")}>
+          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-bold text-slate-950 shadow-lg shadow-emerald-500/20 shrink-0">V</div>
+          {!isCollapsed && (
+            <div className="animate-in fade-in slide-in-from-left-4 duration-500">
+              <h1 className="text-lg font-bold leading-tight">Voltway</h1>
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Industrial OS</p>
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-col gap-1 flex-grow overflow-y-auto custom-scrollbar">
+        <div className="flex flex-col gap-1 flex-grow overflow-y-auto custom-scrollbar no-scrollbar">
           {navItems.map(item => (
             <button 
               key={item.id}
               onClick={() => setActiveTab(item.id as Tab)}
+              title={isCollapsed ? item.label : undefined}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all",
+                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative group",
                 activeTab === item.id 
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200',
+                isCollapsed && "justify-center px-0"
               )}
             >
               <span className="text-xl">{item.icon}</span>
-              <span className="text-sm font-medium">{item.label}</span>
+              {!isCollapsed && <span className="text-sm font-medium whitespace-nowrap">{item.label}</span>}
+            </button>
+          ))}
+          
+          <div className={cn("my-6 border-t border-slate-800", isCollapsed ? "mx-2" : "")} />
+          
+          {adminItems.map(item => (
+            <button 
+              key={item.id}
+              onClick={() => setActiveTab(item.id as Tab)}
+              title={isCollapsed ? item.label : undefined}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative",
+                activeTab === item.id 
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200',
+                isCollapsed && "justify-center px-0"
+              )}
+            >
+              <span className="text-xl">{item.icon}</span>
+              {!isCollapsed && <span className="text-sm font-medium whitespace-nowrap">{item.label}</span>}
             </button>
           ))}
         </div>
 
-        <div className="mt-auto pt-6 border-t border-slate-800">
-           <div className="flex items-center justify-between p-4 bg-slate-950 rounded-xl border border-slate-800">
-              <div className="flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Live Sync</span>
-              </div>
-              <Badge variant="success">Online</Badge>
-           </div>
+        <div className="mt-auto pt-6 flex flex-col gap-4">
+           <button 
+             onClick={() => setIsCollapsed(!isCollapsed)}
+             className="flex items-center justify-center h-10 w-full bg-slate-800/50 hover:bg-slate-800 text-slate-400 rounded-xl transition-colors"
+           >
+              <span className={cn("transition-transform duration-300", isCollapsed ? "rotate-180" : "rotate-0")}>
+                {isCollapsed ? "👉" : "👈"}
+              </span>
+           </button>
+
+           {!isCollapsed && (
+             <div className="flex items-center justify-between p-4 bg-slate-950 rounded-xl border border-slate-800 animate-in fade-in slide-in-from-bottom-4">
+                <div className="flex items-center gap-2">
+                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Live Sync</span>
+                </div>
+                <Badge variant="success">Online</Badge>
+             </div>
+           )}
         </div>
       </nav>
 
@@ -106,6 +148,7 @@ const App: React.FC = () => {
               {activeTab === 'dashboard' && <Dashboard state={fullState!} onAskHugo={() => setActiveTab('hugo')} />}
               {activeTab === 'hugo' && <HugoChat state={fullState!} />}
               {activeTab === 'boms' && <BOMManager state={fullState!} />}
+              {activeTab === 'history' && <VersionHistory />}
               
               {activeTab === 'materials' && (
                 <DataTable 

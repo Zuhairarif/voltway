@@ -10,6 +10,16 @@ export interface Material {
   comment?: string;
 }
 
+export interface VersionEntry {
+  version: string;
+  date: string;
+  title: string;
+  changes: {
+    type: 'feature' | 'fix' | 'security' | 'infra';
+    text: string;
+  }[];
+}
+
 export interface Product {
   product_id: string;
   model: string;
