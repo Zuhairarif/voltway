@@ -1,63 +1,71 @@
 
 import React, { useState } from 'react';
-import * as initialData from './data/mockData';
 import Dashboard from './components/Dashboard';
 import HugoChat from './components/HugoChat';
 import DataTable from './components/DataTable';
 import BOMManager from './components/BOMManager';
+import { Badge, cn } from './components/ui';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from './lib/supabase';
 import { AppState } from './types';
 
-type Tab = 'dashboard' | 'hugo' | 'parts' | 'inventory' | 'orders' | 'suppliers' | 'boms';
+type Tab = 'dashboard' | 'hugo' | 'materials' | 'products' | 'customers' | 'inventory' | 'orders' | 'suppliers' | 'boms';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
-  const [state, setState] = useState<AppState>({
-    parts: initialData.parts,
-    strategy: initialData.strategy,
-    purchaseOrders: initialData.purchaseOrders,
-    salesOrders: initialData.salesOrders,
-    inventory: initialData.inventory,
-    movements: initialData.movements,
-    suppliers: initialData.suppliers,
-    boms: initialData.boms,
-  });
 
-  const updateState = (key: keyof AppState, value: any) => {
-    setState(prev => ({ ...prev, [key]: value }));
-  };
+  // We fetch the full state for Dashboard/Hugo, but DataTables handle their own internal queries
+  const { data: fullState, isLoading } = useQuery<AppState>({
+    queryKey: ['full_state'],
+    queryFn: async () => {
+      // Parallel fetch for overview
+      const tables = ['materials', 'products', 'customers', 'bom', 'warehouses', 'stock', 'sales_orders', 'suppliers', 'material_orders', 'dispatch_parameters'];
+      const results = await Promise.all(tables.map(t => supabase.from(t).select('*')));
+      
+      const state: any = {};
+      tables.forEach((t, i) => {
+        state[t] = results[i].data || [];
+      });
+      return state as AppState;
+    },
+    refetchInterval: 30000 // Refresh state every 30s
+  });
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'hugo', label: 'Ask Hugo AI', icon: '🤖' },
-    { id: 'boms', label: 'Technical BOM', icon: '📋' },
-    { id: 'parts', label: 'Parts Master', icon: '🔩' },
-    { id: 'inventory', label: 'Inventory Control', icon: '📦' },
-    { id: 'orders', label: 'Order Hub', icon: '📝' },
-    { id: 'suppliers', label: 'Supplier Catalog', icon: '🏭' },
+    { id: 'hugo', label: 'Hugo AI', icon: '🤖' },
+    { id: 'boms', label: 'Production BOM', icon: '📋' },
+    { id: 'materials', label: 'Material Master', icon: '🔩' },
+    { id: 'products', label: 'Product Catalog', icon: '🛵' },
+    { id: 'customers', label: 'Client Base', icon: '👥' },
+    { id: 'inventory', label: 'Stock Levels', icon: '📦' },
+    { id: 'orders', label: 'Purchasing', icon: '📝' },
+    { id: 'suppliers', label: 'Vendor Registry', icon: '🏭' },
   ];
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-100">
-      {/* Sidebar */}
+      {/* Sidebar Navigation */}
       <nav className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col p-6 shrink-0">
         <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-xl flex items-center justify-center font-bold text-slate-900 shadow-lg shadow-emerald-500/20">V</div>
+          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-bold text-slate-950 shadow-lg shadow-emerald-500/20">V</div>
           <div>
             <h1 className="text-lg font-bold leading-tight">Voltway</h1>
             <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Industrial OS</p>
           </div>
         </div>
 
-        <div className="flex flex-col gap-1 flex-grow">
+        <div className="flex flex-col gap-1 flex-grow overflow-y-auto custom-scrollbar">
           {navItems.map(item => (
             <button 
               key={item.id}
               onClick={() => setActiveTab(item.id as Tab)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all",
                 activeTab === item.id 
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-inner' 
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                 : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
-              }`}
+              )}
             >
               <span className="text-xl">{item.icon}</span>
               <span className="text-sm font-medium">{item.label}</span>
@@ -66,116 +74,121 @@ const App: React.FC = () => {
         </div>
 
         <div className="mt-auto pt-6 border-t border-slate-800">
-          <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-800">
-            <div className="text-[10px] text-slate-500 font-bold uppercase mb-2">System Health</div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-400">Hugo Engine</span>
-              <span className="text-emerald-500 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Ready
-              </span>
-            </div>
-          </div>
+           <div className="flex items-center justify-between p-4 bg-slate-950 rounded-xl border border-slate-800">
+              <div className="flex items-center gap-2">
+                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Live Sync</span>
+              </div>
+              <Badge variant="success">Online</Badge>
+           </div>
         </div>
       </nav>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-950/50 backdrop-blur-md">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-500">/</span>
-            <h2 className="text-sm font-semibold tracking-wide text-slate-300 uppercase">{activeTab}</h2>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="h-8 w-[1px] bg-slate-800"></div>
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <p className="text-xs font-bold text-slate-200">Ops Lead</p>
-                <p className="text-[10px] text-slate-500">Facility WH-1</p>
-              </div>
-              <img src="https://picsum.photos/seed/ops/80/80" className="w-9 h-9 rounded-full ring-2 ring-slate-800 shadow-xl" alt="Profile" />
-            </div>
+        <header className="h-16 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-950/50 backdrop-blur-md sticky top-0 z-10">
+          <h2 className="text-xs font-black tracking-[0.2em] text-slate-500 uppercase">{activeTab}</h2>
+          <div className="flex items-center gap-4">
+             <div className="px-3 py-1 bg-slate-900 border border-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Env: Prod-Main
+             </div>
           </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-          {activeTab === 'dashboard' && <Dashboard state={state} onAskHugo={() => setActiveTab('hugo')} />}
-          {activeTab === 'hugo' && <HugoChat state={state} />}
-          {activeTab === 'boms' && <BOMManager state={state} onUpdate={(newBoms) => updateState('boms', newBoms)} />}
-          {activeTab === 'parts' && (
-             <DataTable 
-               title="Parts Master" 
-               data={state.parts} 
-               columns={[
-                 { key: 'id', label: 'Part ID' },
-                 { key: 'name', label: 'Description' },
-                 { key: 'type', label: 'Type' },
-                 { key: 'weight', label: 'KG' },
-                 { key: 'successorParts', label: 'Successor' }
-               ]}
-             />
-          )}
-          {activeTab === 'inventory' && (
-             <div className="space-y-8">
-               <DataTable 
-                 title="Current Stock Availability" 
-                 data={state.inventory} 
-                 columns={[
-                   { key: 'partId', label: 'ID' },
-                   { key: 'partName', label: 'Part' },
-                   { key: 'location', label: 'Site' },
-                   { key: 'quantityAvailable', label: 'Available Qty' }
-                 ]}
-               />
-               <DataTable 
-                 title="Inventory Strategy" 
-                 data={state.strategy} 
-                 columns={[
-                   { key: 'partId', label: 'Part ID' },
-                   { key: 'minStockLevel', label: 'Min Level' },
-                   { key: 'reorderQuantity', label: 'Reorder Qty' },
-                   { key: 'reorderIntervalDays', label: 'Interval (Days)' }
-                 ]}
-               />
-             </div>
-          )}
-          {activeTab === 'orders' && (
-            <div className="space-y-8">
-               <DataTable 
-                 title="Purchase Orders (Inbound)" 
-                 data={state.purchaseOrders} 
-                 columns={[
-                   { key: 'id', label: 'PO ID' },
-                   { key: 'partId', label: 'Part' },
-                   { key: 'quantityOrdered', label: 'Qty' },
-                   { key: 'expectedDeliveryDate', label: 'Due' },
-                   { key: 'status', label: 'Status' }
-                 ]}
-               />
-               <DataTable 
-                 title="Sales Orders (Outbound)" 
-                 data={state.salesOrders} 
-                 columns={[
-                   { key: 'id', label: 'SO ID' },
-                   { key: 'model', label: 'Model' },
-                   { key: 'version', label: 'Version' },
-                   { key: 'quantity', label: 'Qty' },
-                   { key: 'requestedDate', label: 'Requested' }
-                 ]}
-               />
+          {!fullState && isLoading ? (
+            <div className="h-full flex flex-col items-center justify-center gap-4">
+              <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
+              <p className="text-sm text-slate-500 font-medium tracking-widest uppercase">Initializing Core State...</p>
             </div>
-          )}
-          {activeTab === 'suppliers' && (
-            <DataTable 
-              title="Supplier Pricing & Reliability" 
-              data={state.suppliers} 
-              columns={[
-                { key: 'supplierId', label: 'Supplier' },
-                { key: 'partId', label: 'Part' },
-                { key: 'pricePerUnit', label: 'Price ($)' },
-                { key: 'leadTimeDays', label: 'Lead Time' },
-                { key: 'reliabilityRating', label: 'Reliability' }
-              ]}
-            />
+          ) : (
+            <>
+              {activeTab === 'dashboard' && <Dashboard state={fullState!} onAskHugo={() => setActiveTab('hugo')} />}
+              {activeTab === 'hugo' && <HugoChat state={fullState!} />}
+              {activeTab === 'boms' && <BOMManager state={fullState!} />}
+              
+              {activeTab === 'materials' && (
+                <DataTable 
+                  tableName="materials" 
+                  title="Material" 
+                  primaryKey="part_id"
+                  columns={[
+                    { key: 'part_id', label: 'Part ID' },
+                    { key: 'part_name', label: 'Description' },
+                    { key: 'part_type', label: 'Type' },
+                    { key: 'weight', label: 'Weight (KG)' }
+                  ]}
+                />
+              )}
+
+              {activeTab === 'products' && (
+                <DataTable 
+                  tableName="products" 
+                  title="Product" 
+                  primaryKey="product_id"
+                  columns={[
+                    { key: 'product_id', label: 'Product ID' },
+                    { key: 'model', label: 'Model' },
+                    { key: 'version', label: 'Version' },
+                    { key: 'product_name', label: 'Marketing Name' }
+                  ]}
+                />
+              )}
+
+              {activeTab === 'customers' && (
+                <DataTable 
+                  tableName="customers" 
+                  title="Customer" 
+                  primaryKey="customer_id"
+                  columns={[
+                    { key: 'customer_id', label: 'Client ID' },
+                    { key: 'name', label: 'Organization' },
+                    { key: 'type', label: 'Segment' }
+                  ]}
+                />
+              )}
+
+              {activeTab === 'inventory' && (
+                <DataTable 
+                  tableName="stock" 
+                  title="Stock Level" 
+                  primaryKey="part_id"
+                  columns={[
+                    { key: 'part_id', label: 'Material Ref' },
+                    { key: 'location', label: 'Warehouse' },
+                    { key: 'quantity_available', label: 'In Stock' }
+                  ]}
+                />
+              )}
+
+              {activeTab === 'orders' && (
+                <DataTable 
+                  tableName="material_orders" 
+                  title="Material Order" 
+                  primaryKey="order_id"
+                  columns={[
+                    { key: 'order_id', label: 'PO ID' },
+                    { key: 'part_id', label: 'Part' },
+                    { key: 'quantity_ordered', label: 'Qty' },
+                    { key: 'status', label: 'Status' }
+                  ]}
+                />
+              )}
+
+              {activeTab === 'suppliers' && (
+                <DataTable 
+                  tableName="suppliers" 
+                  title="Supplier" 
+                  primaryKey="supplier_id"
+                  columns={[
+                    { key: 'supplier_id', label: 'Vendor ID' },
+                    { key: 'part_id', label: 'Supplies Part' },
+                    { key: 'price_per_unit', label: 'Unit Cost' },
+                    { key: 'lead_time_days', label: 'Lead (Days)' }
+                  ]}
+                />
+              )}
+            </>
           )}
         </div>
       </main>

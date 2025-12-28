@@ -1,20 +1,20 @@
 
 import React, { useState } from 'react';
-// Fix: Changed Material to Part and StockLevel to StockItem as per types.ts
-import { AppState, Part, StockItem } from '../types';
+// Fix: Use correct types Material and Stock from types.ts
+import { AppState, Material, Stock } from '../types';
 
 const InventoryTable: React.FC<{ state: AppState }> = ({ state }) => {
   const [filter, setFilter] = useState('');
 
-  // Fix: Map parts and inventory correctly using partId/id
-  const rows = state.parts.map(p => {
-    const s = state.inventory.find(st => st.partId === p.id);
-    const strat = state.strategy.find(st => st.partId === p.id);
-    const supplier = state.suppliers.find(sup => sup.partId === p.id);
+  // Fix: Map materials and stock correctly using part_id and correct AppState properties
+  const rows = state.materials.map(p => {
+    const s = state.stock.find(st => st.part_id === p.part_id);
+    const strat = state.dispatch_parameters.find(st => st.part_id === p.part_id);
+    const supplier = state.suppliers.find(sup => sup.part_id === p.part_id);
     return { part: p, stock: s, strategy: strat, supplier };
   }).filter(r => 
-    r.part.name.toLowerCase().includes(filter.toLowerCase()) || 
-    r.part.type.toLowerCase().includes(filter.toLowerCase())
+    r.part.part_name.toLowerCase().includes(filter.toLowerCase()) || 
+    r.part.part_type.toLowerCase().includes(filter.toLowerCase())
   );
 
   return (
@@ -49,22 +49,23 @@ const InventoryTable: React.FC<{ state: AppState }> = ({ state }) => {
           </thead>
           <tbody className="divide-y divide-slate-800">
             {rows.map(({ part, stock, strategy, supplier }) => {
-              // Fix: Logic updated to use quantityAvailable and minStockLevel
-              const isCritical = stock && strategy && stock.quantityAvailable < strategy.minStockLevel;
-              const isWarning = stock && strategy && stock.quantityAvailable <= strategy.minStockLevel * 1.2 && !isCritical;
+              // Fix: Logic updated to use quantity_available and min_stock from config_data
+              const minStock = strategy?.config_data?.min_stock || 0;
+              const isCritical = stock && strategy && stock.quantity_available < minStock;
+              const isWarning = stock && strategy && stock.quantity_available <= minStock * 1.2 && !isCritical;
               
               return (
-                <tr key={part.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="px-6 py-4 font-mono text-xs text-slate-500">{part.id}</td>
-                  <td className="px-6 py-4 font-medium">{part.name}</td>
+                <tr key={part.part_id} className="hover:bg-slate-800/30 transition-colors">
+                  <td className="px-6 py-4 font-mono text-xs text-slate-500">{part.part_id}</td>
+                  <td className="px-6 py-4 font-medium">{part.part_name}</td>
                   <td className="px-6 py-4">
                     <span className="px-2 py-1 bg-slate-800 border border-slate-700 rounded-md text-[10px] text-slate-400">
-                      {part.type}
+                      {part.part_type}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right font-bold">{stock?.quantityAvailable || 0}</td>
-                  <td className="px-6 py-4 text-right text-slate-400">{strategy?.minStockLevel || 0}</td>
-                  <td className="px-6 py-4 text-right text-slate-400">{supplier?.leadTimeDays || '-'}</td>
+                  <td className="px-6 py-4 text-right font-bold">{stock?.quantity_available || 0}</td>
+                  <td className="px-6 py-4 text-right text-slate-400">{minStock}</td>
+                  <td className="px-6 py-4 text-right text-slate-400">{supplier?.lead_time_days || '-'}</td>
                   <td className="px-6 py-4">
                     {isCritical ? (
                       <span className="text-red-400 text-xs font-bold px-2 py-1 bg-red-400/10 rounded-full">CRITICAL</span>

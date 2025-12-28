@@ -9,127 +9,86 @@ interface Props {
 }
 
 const Dashboard: React.FC<Props> = ({ state, onAskHugo }) => {
-  // Fix: Map inventory to health alerts by cross-referencing with strategy reorder points
-  const stockAlerts = state.inventory.filter(item => {
-    const strat = state.strategy.find(s => s.partId === item.partId);
-    return strat ? item.quantityAvailable <= strat.minStockLevel : false;
+  const shortages = state.stock.filter(s => {
+    const config = state.dispatch_parameters.find(p => p.part_id === s.part_id);
+    return config ? s.quantity_available <= (config.config_data?.min_stock || 0) : false;
   });
 
-  // Fix: Map chart data from inventory and parts collections
-  const chartData = state.inventory.slice(0, 6).map(item => {
-    const strat = state.strategy.find(s => s.partId === item.partId);
-    return {
-      name: item.partName.split(' ')[0],
-      qty: item.quantityAvailable,
-      reorder: strat?.minStockLevel || 0
-    };
-  });
+  const chartData = state.stock.slice(0, 8).map(s => ({
+    name: s.part_id,
+    qty: s.quantity_available
+  }));
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Top Cards */}
+    <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card title="Critical Stockouts" value={stockAlerts.length.toString()} color="text-red-400" />
-        {/* Fix: use purchaseOrders instead of materialOrders */}
-        <Card title="Pending Deliveries" value={state.purchaseOrders.filter(po => po.status === 'ordered').length.toString()} color="text-blue-400" />
-        <Card title="Open Orders (Units)" value={state.salesOrders.reduce((acc, curr) => acc + curr.quantity, 0).toString()} color="text-amber-400" />
-        {/* Fix: Calculate unique suppliers from catalog */}
-        <Card title="Active Suppliers" value={Array.from(new Set(state.suppliers.map(s => s.supplierId))).length.toString()} color="text-emerald-400" />
+        <Card title="Critical Shortages" value={shortages.length.toString()} color="text-rose-500" trend="Action required" />
+        <Card title="Open POs" value={state.material_orders.filter(o => o.status === 'ordered').length.toString()} color="text-blue-400" trend="Supply inbound" />
+        <Card title="Sales Volume" value={state.sales_orders.reduce((a, b) => a + b.quantity, 0).toString()} color="text-emerald-500" trend="Active demand" />
+        <Card title="Supplier Count" value={new Set(state.suppliers.map(s => s.supplier_id)).size.toString()} color="text-amber-500" trend="Network active" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Alerts & Insights */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-            <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-              <span className="text-emerald-400">⚡</span> Hugo's Smart Alerts
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400">🤖</span>
+              Operations Overview
             </h3>
             <div className="space-y-4">
-              {/* Fix: Removed emails mapping as it doesn't exist in AppState; replacing with dynamic alerts */}
-              <div className="p-4 bg-slate-800/50 rounded-xl border-l-4 border-amber-500">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="font-semibold text-slate-200">Inventory Health Review</span>
-                  <span className="text-xs text-slate-500">System Notification</span>
+              {shortages.length > 0 ? (
+                shortages.map((s, i) => (
+                  <div key={i} className="p-4 bg-slate-950/50 rounded-2xl border-l-4 border-l-rose-500 flex justify-between items-center">
+                    <div>
+                      <div className="font-bold text-slate-200">Stock Alert: {s.part_id}</div>
+                      <p className="text-xs text-slate-500">Only {s.quantity_available} units remaining at {s.location}.</p>
+                    </div>
+                    <button onClick={onAskHugo} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold rounded-xl transition-colors">Resolve</button>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 bg-emerald-500/5 rounded-2xl border-l-4 border-l-emerald-500 text-emerald-400/80 italic text-sm">
+                  "No critical stock alerts detected. All warehouse levels are above minimum thresholds."
                 </div>
-                <p className="text-sm text-slate-400 line-clamp-2 mb-3">
-                  Hugo detected {stockAlerts.length} components falling below safety stock. Production planning suggests immediate rebalancing.
-                </p>
-                <button onClick={onAskHugo} className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-wider">
-                  Solve with Hugo →
-                </button>
-              </div>
-
-              <div className="p-4 bg-slate-800/50 rounded-xl border-l-4 border-red-500">
-                <div className="font-semibold text-slate-200">Stock Alert: {stockAlerts[0]?.partName || 'Critical Components'}</div>
-                <p className="text-sm text-slate-400 mb-3">Current inventory ({stockAlerts[0]?.quantityAvailable || 0} units) is below reorder point. Lead times are projected to increase.</p>
-                <button onClick={onAskHugo} className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-wider">
-                  Generate Reorder Plan →
-                </button>
-              </div>
+              )}
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-            <h3 className="text-lg font-bold mb-6">Inventory Utilization (Top 6)</h3>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                    itemStyle={{ color: '#f1f5f9' }}
-                  />
-                  <Bar dataKey="qty" radius={[4, 4, 0, 0]}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.qty < entry.reorder ? '#f87171' : '#10b981'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 h-[350px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                <XAxis dataKey="name" stroke="#475569" fontSize={10} axisLine={false} tickLine={false} />
+                <YAxis stroke="#475569" fontSize={10} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px' }} />
+                <Bar dataKey="qty" fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Right Column: Build Forecast */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col">
-          <h3 className="text-lg font-bold mb-6">Build Potential</h3>
-          <p className="text-xs text-slate-400 mb-6">Calculated based on current warehouse stock & BOM requirements.</p>
-          
-          <div className="space-y-6 flex-grow">
-            {/* Fix: Calculation based on mock parts and stock */}
-            <BuildMeter label="S1-V1 (Base)" count={Math.min(state.inventory.find(i => i.partId === 'P300')?.quantityAvailable || 0, state.inventory.find(i => i.partId === 'P301')?.quantityAvailable || 0)} max={100} color="bg-emerald-500" />
-            <BuildMeter label="S2-V2 (Adv)" count={Math.min(state.inventory.find(i => i.partId === 'P312')?.quantityAvailable || 0, 15)} max={100} color="bg-blue-500" />
-            <BuildMeter label="Pro-Fleet" count={0} max={100} color="bg-red-500" />
-          </div>
-
-          <div className="mt-8 p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/20">
-            <div className="text-sm font-semibold text-emerald-400 mb-1">Hugo's Tip:</div>
-            <p className="text-xs text-slate-400 italic">"P312 Brushless Motor is currently flagged with quality blockers. Resolve technical debt to unlock Pro-Fleet assembly."</p>
-          </div>
+        <div className="space-y-6">
+           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+              <h4 className="font-bold text-slate-300 mb-4 uppercase text-[10px] tracking-widest">Facility Uptime</h4>
+              <div className="text-4xl font-black text-emerald-500 mb-1">99.8%</div>
+              <p className="text-xs text-slate-500">All assembly lines operating within nominal parameters.</p>
+           </div>
+           <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl p-6 shadow-lg shadow-emerald-500/10 text-slate-950">
+              <h4 className="font-bold mb-1">Procurement Sync</h4>
+              <p className="text-xs font-medium opacity-80 mb-4">Cloud synchronization is active and mirroring to Supabase.</p>
+              <button className="w-full py-3 bg-slate-950 text-emerald-400 text-xs font-bold rounded-xl hover:opacity-90 transition-opacity uppercase tracking-widest">System Healthy</button>
+           </div>
         </div>
       </div>
     </div>
   );
 };
 
-const Card: React.FC<{ title: string; value: string; color: string }> = ({ title, value, color }) => (
-  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
-    <div className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">{title}</div>
-    <div className={`text-3xl font-bold ${color}`}>{value}</div>
-  </div>
-);
-
-const BuildMeter: React.FC<{ label: string; count: number; max: number; color: string }> = ({ label, count, max, color }) => (
-  <div className="space-y-2">
-    <div className="flex justify-between text-sm">
-      <span className="text-slate-300">{label}</span>
-      <span className="font-bold text-white">{count} units</span>
-    </div>
-    <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-      <div className={`h-full ${color}`} style={{ width: `${(count / max) * 100}%` }}></div>
-    </div>
+const Card: React.FC<{ title: string; value: string; color: string; trend: string }> = ({ title, value, color, trend }) => (
+  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{title}</div>
+    <div className={`text-4xl font-black ${color} mb-1`}>{value}</div>
+    <div className="text-[10px] text-slate-600 font-medium uppercase tracking-tighter">{trend}</div>
   </div>
 );
 

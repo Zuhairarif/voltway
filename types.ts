@@ -1,89 +1,102 @@
 
-export interface Part {
-  id: string;
-  name: string;
-  type: string;
-  usedInModels: string[];
+export interface Material {
+  part_id: string;
+  part_name: string;
+  part_type: string;
   dimensions?: string;
   weight: number;
-  blockedParts?: string;
-  successorParts?: string;
+  blocked_parts?: string[];
+  successor_parts?: string[];
   comment?: string;
 }
 
-export interface BOMComponent {
-  partId: string;
-  quantity: number;
-  notes?: string;
-}
-
-export interface BOM {
-  id: string; // Model_Version identifier
+export interface Product {
+  product_id: string;
   model: string;
   version: string;
-  components: BOMComponent[];
-  assemblyRequirements?: string[];
+  product_name: string;
 }
 
-export interface InventoryStrategy {
-  partId: string;
-  minStockLevel: number;
-  reorderQuantity: number;
-  reorderIntervalDays: number;
+export interface Customer {
+  customer_id: string;
+  name: string;
+  type: 'fleet' | 'retail';
 }
 
-export interface PurchaseOrder {
-  id: string;
-  partId: string;
-  quantityOrdered: number;
-  orderDate: string;
-  expectedDeliveryDate: string;
-  supplierId: string;
-  status: 'ordered' | 'delivered';
-  actualDeliveredAt?: string;
-}
-
-export interface SalesOrder {
-  id: string;
-  model: string;
-  version: string;
+export interface BOMEntry {
+  product_id: string;
+  part_id: string;
   quantity: number;
-  orderType: string;
-  requestedDate: string;
-  createdAt: string;
-  acceptedRequestDate: string;
 }
 
-export interface StockItem {
-  partId: string;
-  partName: string;
+export interface Warehouse {
   location: string;
-  quantityAvailable: number;
+  description?: string;
+}
+
+export interface Stock {
+  part_id: string;
+  location: string;
+  quantity_available: number;
 }
 
 export interface StockMovement {
+  id?: string;
   date: string;
-  partId: string;
+  part_id: string;
+  location: string;
   type: 'inbound' | 'outbound';
   quantity: number;
 }
 
-export interface SupplierOffer {
-  supplierId: string;
-  partId: string;
-  pricePerUnit: number;
-  leadTimeDays: number;
-  minOrderQty: number;
-  reliabilityRating: number;
+export interface SalesOrder {
+  sales_order_id: string;
+  product_id: string;
+  customer_id: string;
+  quantity: number;
+  order_type: string;
+  requested_date: string;
+  created_at: string;
+  accepted_request_date: string;
+  status: string;
+}
+
+export interface Supplier {
+  supplier_id: string;
+  part_id: string;
+  price_per_unit: number;
+  lead_time_days: number;
+  min_order_qty: number;
+  reliability_rating: number;
+}
+
+export interface MaterialOrder {
+  order_id: string;
+  part_id: string;
+  supplier_id: string;
+  quantity_ordered: number;
+  order_date: string;
+  expected_delivery_date: string;
+  status: 'ordered' | 'delivered';
+  actual_delivered_at?: string;
+}
+
+export interface DispatchParameter {
+  part_id: string;
+  config_data: any;
+  updated_at: string;
 }
 
 export interface AppState {
-  parts: Part[];
-  strategy: InventoryStrategy[];
-  purchaseOrders: PurchaseOrder[];
-  salesOrders: SalesOrder[];
-  inventory: StockItem[];
-  movements: StockMovement[];
-  suppliers: SupplierOffer[];
-  boms: BOM[];
+  materials: Material[];
+  products: Product[];
+  customers: Customer[];
+  bom: BOMEntry[];
+  warehouses: Warehouse[];
+  stock: Stock[];
+  stock_movements: StockMovement[];
+  sales_orders: SalesOrder[];
+  suppliers: Supplier[];
+  material_orders: MaterialOrder[];
+  dispatch_parameters: DispatchParameter[];
 }
